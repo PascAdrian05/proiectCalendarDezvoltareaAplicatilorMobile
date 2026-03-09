@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <fragment
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".MapsActivity" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPrimireDate"
+        style="@style/Widget.Material3.Button.ElevatedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="48dp"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:text="Confirmă Locația"
+        android:textAllCaps="false"
+        android:textColor="#03A9F4"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:cornerRadius="28dp"
+        app:elevation="12dp"
+        app:icon="@android:drawable/ic_menu_save"
+        app:iconTint="#03A9F4"
+        app:rippleColor="#B3E5FC"
+        app:strokeColor="#03A9F4"
+        app:strokeWidth="1dp" />
+
+</FrameLayout>
