@@ -2,6 +2,7 @@ package com.example.proiectcalendarumfst;
 
 import android.app.TimePickerDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -21,10 +22,18 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.example.proiectcalendarumfst.ConectareBackEnd.ApiService;
+import com.example.proiectcalendarumfst.ConectareBackEnd.DtoEveniment;
+import com.example.proiectcalendarumfst.ConectareBackEnd.RetrofitClient;
 import com.google.android.material.textfield.TextInputEditText;
 
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Vector;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class AdaugareActivity extends AppCompatActivity implements TimePickerDialog.OnTimeSetListener {
 
@@ -36,8 +45,9 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
     Spinner spinner;
     Button button2;
     TextInputEditText titlu;
-    String date;
+    LocalDate date;
     String selectedItem = "";
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final ActivityResultLauncher<Intent> mapLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -63,8 +73,10 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
         });
 
         textView4 = findViewById(R.id.textView4);
-        date = getIntent().getStringExtra("date");
-        textView4.setText("Adaugare eveniment in data de " + date);
+        date = (LocalDate) getIntent().getSerializableExtra("date");
+        if (date != null) {
+            textView4.setText("Adaugare eveniment in data de " + date.format(formatter));
+        }
 
         buttonOra = findViewById(R.id.buttonOra);
         switch1 = findViewById(R.id.switch1);
@@ -74,16 +86,16 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
         notite = findViewById(R.id.notite);
         buttonLocatie = findViewById(R.id.buttonLocatie);
 
-        Eveniment ev=(Eveniment) getIntent().getSerializableExtra("evenimentUpdate");
+        DtoEveniment ev = (DtoEveniment) getIntent().getSerializableExtra("evenimentUpdate");
         int index = getIntent().getIntExtra("index", -1);
 
-        if(ev!=null) {
-            textView4.setText("Modificare eveniment in data de " + ev.getData());
+        if(ev != null) {
+            textView4.setText("Modificare eveniment in data de " + LocalDate.parse(ev.getData()).format(formatter));
             titlu.setText(ev.getTitlu());
             buttonOra.setText(ev.getOra());
             buttonLocatie.setText(ev.getLocatie());
             notite.setText(ev.getNote());
-            selectedItem=ev.getCategorie();
+            selectedItem = ev.getCategorie();
             creareSpinner();
             
             if (spinner.getAdapter() != null) {
@@ -91,7 +103,7 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                 spinner.setSelection(pos);
             }
 
-            if(ev.getOra().equals("Toata ziua")) {
+            if("Toata ziua".equals(ev.getOra())) {
                 switch1.setChecked(true);
                 buttonOra.setEnabled(false);
             }
@@ -103,22 +115,66 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
 
             button2.setOnClickListener(v -> {
                 if (validareCampuri()) {
-                    ev.setTitlu(titlu.getText().toString());
-                    ev.setCategorie(selectedItem);
-                    ev.setOra(buttonOra.getText().toString());
-                    ev.setLocatie(buttonLocatie.getText().toString());
-                    ev.setNote(notite.getText().toString());
+                    SharedPreferences sharedPreferences = getSharedPreferences("preferences", MODE_PRIVATE);
+                    String token = sharedPreferences.getString("token", null);
+                    
+                    if (token != null) {
+                        String tokenptrServer = "Bearer " + token;
+                        
+                        // Actualizăm obiectul local
+                        ev.setTitlu(titlu.getText().toString());
+                        ev.setCategorie(selectedItem);
+                        ev.setOra(buttonOra.getText().toString());
+                        ev.setLocatie(buttonLocatie.getText().toString());
+                        ev.setNote(notite.getText().toString());
 
-                    if (index != -1) {
-                        CalendarActivity.evenimente.set(index, ev);
+                        ApiService apiService = RetrofitClient.getClient().create(ApiService.class);
+                        // Apelăm serverul pentru UPDATE
+                        apiService.updateEveniment(tokenptrServer, ev.getId(), ev).enqueue(new Callback<DtoEveniment>() {
+                            @Override
+                            public void onResponse(Call<DtoEveniment> call, Response<DtoEveniment> response) {
+                                if (response.isSuccessful()) {
+                                    Toast.makeText(AdaugareActivity.this, "Eveniment modificat!", Toast.LENGTH_SHORT).show();
+                                    finish();
+                                } else {
+                                    Toast.makeText(AdaugareActivity.this, "Eroare la modificare: " + response.code(), Toast.LENGTH_SHORT).show();
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(Call<DtoEveniment> call, Throwable t) {
+                                Toast.makeText(AdaugareActivity.this, "Eroare rețea", Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     }
-
-                    finish();
                 }
             });
         }
-        else{
-            verificare();
+        else {
+            // Logica pentru ADAUGARE (rămâne neschimbată)
+            button2.setOnClickListener(v -> {
+                if (validareCampuri()) {
+                    SharedPreferences sharedPreferences=getSharedPreferences("preferences",MODE_PRIVATE);
+                    String token=sharedPreferences.getString("token",null);
+                    if(token!=null){
+                        String tokenptrServer="Bearer "+token;
+                        String dataFormatataPentruServer = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                        DtoEveniment evenimentReq = new DtoEveniment(titlu.getText().toString(), dataFormatataPentruServer, buttonOra.getText().toString(), buttonLocatie.getText().toString(), selectedItem, notite.getText().toString());
+                        
+                        ApiService apiService= RetrofitClient.getClient().create(ApiService.class);
+                        apiService.adaugareEveniment(evenimentReq, tokenptrServer).enqueue(new Callback<DtoEveniment>() {
+                            @Override
+                            public void onResponse(Call<DtoEveniment> call, Response<DtoEveniment> response) {
+                                if(response.isSuccessful()){
+                                    finish();
+                                }
+                            }
+                            @Override
+                            public void onFailure(Call<DtoEveniment> call, Throwable t) {}
+                        });
+                    }
+                }
+            });
         }
         
         apasareOra();
@@ -128,19 +184,11 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
     }
 
     private boolean validareCampuri() {
-        boolean isValid = true;
         if (titlu.getText().toString().isEmpty()) {
             titlu.setError("Titlu invalid");
-            isValid = false;
+            return false;
         }
-        if (!switch1.isChecked() && buttonOra.getText().toString().equals("Selectare ora")) {
-            buttonOra.setError("Ora invalida");
-            isValid = false;
-        }
-        if (!isValid) {
-            Toast.makeText(AdaugareActivity.this, "Date invalide", Toast.LENGTH_SHORT).show();
-        }
-        return isValid;
+        return true;
     }
 
     public void apasareOra() {
@@ -198,22 +246,8 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                     selectedItem = "";
                 }
             }
-
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
-        });
-    }
-
-    public void verificare() {
-        button2.setOnClickListener(v -> {
-            if (validareCampuri()) {
-                Eveniment eveniment = new Eveniment(titlu.getText().toString(), date, buttonOra.getText().toString(), buttonLocatie.getText().toString(), selectedItem, notite.getText().toString());
-                Intent intent = new Intent(AdaugareActivity.this, CalendarActivity.class);
-                intent.putExtra("eveniment", eveniment);
-                startActivity(intent);
-                finish();
-            }
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 }

@@ -1,10 +1,12 @@
 package com.example.proiectcalendarumfst;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.CalendarView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -14,9 +16,19 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.proiectcalendarumfst.ConectareBackEnd.ApiService;
+import com.example.proiectcalendarumfst.ConectareBackEnd.DtoEveniment;
+import com.example.proiectcalendarumfst.ConectareBackEnd.RetrofitClient;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class CalendarActivity extends AppCompatActivity {
 
@@ -24,10 +36,11 @@ public class CalendarActivity extends AppCompatActivity {
     TextView textView2;
     CalendarView calendarView;
     Button button;
-    String date = "";
-    
-    static List<Eveniment> evenimente = new ArrayList<>();
-    List<Eveniment> listaFiltrata = new ArrayList<>();
+    LocalDate selectedDate;
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+
+    public static List<DtoEveniment> evenimente = new ArrayList<>();
+    List<DtoEveniment> listaFiltrata = new ArrayList<>();
     RecyclerView recyclerViewTasks;
     EvenimentAdapter adapter;
 
@@ -54,66 +67,82 @@ public class CalendarActivity extends AppCompatActivity {
         adapter = new EvenimentAdapter(listaFiltrata);
         recyclerViewTasks.setAdapter(adapter);
 
-
-
-        Eveniment nouEveniment = (Eveniment) getIntent().getSerializableExtra("eveniment");
-        if (nouEveniment != null) {
-            evenimente.add(nouEveniment);
-        }
-
         String name = getIntent().getStringExtra("name");
         if (name != null) {
             textView.setText("Bine ai venit \n" + name);
         }
 
+        selectedDate = LocalDate.now();
+        textView2.setText("Data selectată: " + selectedDate.format(formatter));
 
-        Calendar c = Calendar.getInstance();
-        int year = c.get(Calendar.YEAR);
-        int month = c.get(Calendar.MONTH);
-        int day = c.get(Calendar.DAY_OF_MONTH);
-        date = day + "/" + (month + 1) + "/" + year;
-        textView2.setText("Data selectată: " + date);
-
-        filtrareEvenimente(date);
+        // Am eliminat filtrareEvenimente de aici pentru că se apelează automat în onResume()
         actiune();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (date != null && !date.isEmpty()) {
-            filtrareEvenimente(date);
+        if (selectedDate != null) {
+            filtrareEvenimente(selectedDate);
         }
     }
 
-    private void filtrareEvenimente(String dataSelectata) {
-        listaFiltrata.clear();
-        for(Eveniment e : evenimente){
-            if(e.getData().equals(dataSelectata)){
-                listaFiltrata.add(e);
-            }
+    private void filtrareEvenimente(LocalDate dataSelectata) {
+        SharedPreferences preferences=getSharedPreferences("preferences",MODE_PRIVATE);
+        String token=preferences.getString("token",null);
+        if(token!=null){
+            String tokenptrServer="Bearer "+token;
+            ApiService apiService= RetrofitClient.getClient().create(ApiService.class);
+           Call<List<DtoEveniment>> da=apiService.evenimenteleUtilizatorului(tokenptrServer);
+           da.enqueue(new Callback<List<DtoEveniment>>() {
+               @Override
+               public void onResponse(Call<List<DtoEveniment>> call, Response<List<DtoEveniment>> response) {
+                   if(response.isSuccessful()){
+                       evenimente = response.body();
+                       listaFiltrata.clear(); // Curățăm lista doar după ce primim răspunsul de la server
+                       if (evenimente != null) {
+                           for (DtoEveniment eveniment : evenimente) {
+                               if (eveniment.getData() != null && eveniment.getData().equals(dataSelectata.toString())) {
+                                   listaFiltrata.add(eveniment);
+                               }
+                           }
+                       }
+                       adapter.notifyDataSetChanged();
+                   }
+                   else{
+                       Toast.makeText(CalendarActivity.this,"Eroare la incarcare evenimente",Toast.LENGTH_SHORT).show();
+                   }
+               }
+
+               @Override
+               public void onFailure(Call<List<DtoEveniment>> call, Throwable throwable) {
+                   Toast.makeText(CalendarActivity.this,"Failed response server",Toast.LENGTH_SHORT).show();
+               }
+           });
         }
-        adapter.notifyDataSetChanged();
+        else{
+            Toast.makeText(CalendarActivity.this,"Nu exista token",Toast.LENGTH_SHORT).show();
+        }
     }
 
     public void actiune() {
         calendarView.setOnDateChangeListener(new CalendarView.OnDateChangeListener() {
             @Override
             public void onSelectedDayChange(CalendarView view, int year, int month, int dayOfMonth) {
-                date = dayOfMonth + "/" + (month + 1) + "/" + year;
-                textView2.setText("Data selectată: " + date);
+                selectedDate = LocalDate.of(year, month + 1, dayOfMonth);
+                textView2.setText("Data selectată: " + selectedDate.format(formatter));
                 
-                filtrareEvenimente(date);
+                filtrareEvenimente(selectedDate);
 
-                Calendar selectedDate = Calendar.getInstance();
-                selectedDate.set(year, month, dayOfMonth);
+                Calendar cal = Calendar.getInstance();
+                cal.set(year, month, dayOfMonth);
                 Calendar today = Calendar.getInstance();
                 today.set(Calendar.HOUR_OF_DAY, 0);
                 today.set(Calendar.MINUTE, 0);
                 today.set(Calendar.SECOND, 0);
                 today.set(Calendar.MILLISECOND, 0);
 
-                if (selectedDate.before(today)) {
+                if (cal.before(today)) {
                     button.setEnabled(false);
                 } else {
                     button.setEnabled(true);
@@ -123,7 +152,7 @@ public class CalendarActivity extends AppCompatActivity {
 
         button.setOnClickListener(v -> {
             Intent intent = new Intent(CalendarActivity.this, AdaugareActivity.class);
-            intent.putExtra("date", date);
+            intent.putExtra("date", selectedDate);
             startActivity(intent);
         });
     }
