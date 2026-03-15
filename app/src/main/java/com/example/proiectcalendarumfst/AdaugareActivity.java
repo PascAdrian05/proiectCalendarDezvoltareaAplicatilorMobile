@@ -117,10 +117,10 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                 if (validareCampuri()) {
                     SharedPreferences sharedPreferences = getSharedPreferences("preferences", MODE_PRIVATE);
                     String token = sharedPreferences.getString("token", null);
-                    
+
                     if (token != null) {
                         String tokenptrServer = "Bearer " + token;
-                        
+
                         // Actualizăm obiectul local
                         ev.setTitlu(titlu.getText().toString());
                         ev.setCategorie(selectedItem);

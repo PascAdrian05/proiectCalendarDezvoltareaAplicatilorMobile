@@ -1,8 +1,10 @@
 package com.example.proiectcalendarumfst;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.CalendarView;
 import android.widget.TextView;
@@ -94,6 +96,9 @@ public class CalendarActivity extends AppCompatActivity {
             String tokenptrServer="Bearer "+token;
             ApiService apiService= RetrofitClient.getClient().create(ApiService.class);
            Call<List<DtoEveniment>> da=apiService.evenimenteleUtilizatorului(tokenptrServer);
+            final ProgressDialog loading = new ProgressDialog(this);
+            loading.setMessage("Se încarcă...");
+            loading.show();
            da.enqueue(new Callback<List<DtoEveniment>>() {
                @Override
                public void onResponse(Call<List<DtoEveniment>> call, Response<List<DtoEveniment>> response) {
@@ -107,16 +112,19 @@ public class CalendarActivity extends AppCompatActivity {
                                }
                            }
                        }
+                       loading.dismiss();
                        adapter.notifyDataSetChanged();
                    }
                    else{
                        Toast.makeText(CalendarActivity.this,"Eroare la incarcare evenimente",Toast.LENGTH_SHORT).show();
+                       loading.dismiss();
                    }
                }
 
                @Override
                public void onFailure(Call<List<DtoEveniment>> call, Throwable throwable) {
-                   Toast.makeText(CalendarActivity.this,"Failed response server",Toast.LENGTH_SHORT).show();
+                   Log.e("CalendarActivity", "Failed response server");
+                   loading.dismiss();
                }
            });
         }
