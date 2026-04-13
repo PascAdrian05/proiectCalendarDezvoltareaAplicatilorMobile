@@ -4,14 +4,29 @@ param(
     [int]$DbPort = 3306,
     [string]$DbName = "bazaDeDateCalendar",
     [string]$DbUser = "root",
-    [string]$DbPass = "root",
+    [string]$DbPass = "",
     [int]$ServerPort = 8080,
-    [string]$JwtSecret = "5e0a36c198ea02ad460d3e82faca99e740f87e9c9575442572d6b7cddc5d19ec",
+    [string]$JwtSecret = "",
     [switch]$DryRun,
     [switch]$PersistJavaHome
 )
 
 $ErrorActionPreference = "Stop"
+
+function New-RandomSecret {
+    param([int]$ByteLength = 48)
+
+    $bytes = New-Object byte[] $ByteLength
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        $rng.Dispose()
+    }
+
+    return [Convert]::ToBase64String($bytes).TrimEnd('=') -replace '\+', '-' -replace '/', '_'
+}
 
 function Resolve-JavaHome {
     param([string]$UserProvided)
@@ -58,15 +73,42 @@ if ($PersistJavaHome) {
     [Environment]::SetEnvironmentVariable("JAVA_HOME", $resolvedJavaHome, "User")
 }
 
+$resolvedDbPass = if ($PSBoundParameters.ContainsKey('DbPass')) {
+    $DbPass
+} elseif ($env:SPRING_DATASOURCE_PASSWORD) {
+    $env:SPRING_DATASOURCE_PASSWORD
+} else {
+    ""
+}
+
+$jwtWasProvided = ($PSBoundParameters.ContainsKey('JwtSecret') -and $JwtSecret) -or [bool]$env:JWT_SECRET_KEY
+$resolvedJwtSecret = if ($PSBoundParameters.ContainsKey('JwtSecret') -and $JwtSecret) {
+    $JwtSecret
+} elseif ($env:JWT_SECRET_KEY) {
+    $env:JWT_SECRET_KEY
+} else {
+    New-RandomSecret
+}
+
 $env:SPRING_DATASOURCE_URL = "jdbc:mysql://${DbHost}:$DbPort/${DbName}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
 $env:SPRING_DATASOURCE_USERNAME = $DbUser
-$env:SPRING_DATASOURCE_PASSWORD = $DbPass
-$env:JWT_SECRET_KEY = $JwtSecret
+$env:SPRING_DATASOURCE_PASSWORD = $resolvedDbPass
+$env:JWT_SECRET_KEY = $resolvedJwtSecret
 $env:SERVER_PORT = "$ServerPort"
 
 Write-Host "JAVA_HOME = $env:JAVA_HOME"
 Write-Host "SPRING_DATASOURCE_URL = $env:SPRING_DATASOURCE_URL"
 Write-Host "SPRING_DATASOURCE_USERNAME = $env:SPRING_DATASOURCE_USERNAME"
+if ([string]::IsNullOrWhiteSpace($resolvedDbPass)) {
+    Write-Host "SPRING_DATASOURCE_PASSWORD = <gol - foloseste parola goala sau seteaza -DbPass>"
+} else {
+    Write-Host "SPRING_DATASOURCE_PASSWORD = <setat din argument sau mediu>"
+}
+if ($jwtWasProvided) {
+    Write-Host "JWT_SECRET_KEY = <setat din argument sau mediu>"
+} else {
+    Write-Host "JWT_SECRET_KEY = <generat temporar pentru sesiunea curenta>"
+}
 Write-Host "SERVER_PORT = $env:SERVER_PORT"
 
 & java -version

@@ -3,6 +3,11 @@ plugins {
     alias(libs.plugins.google.android.libraries.mapsplatform.secrets.gradle.plugin)
 }
 
+secrets {
+    propertiesFileName = "app/secrets.properties"
+    defaultPropertiesFileName = "app/local.defaults.properties"
+}
+
 android {
     namespace = "com.example.proiectcalendarumfst"
     compileSdk {
