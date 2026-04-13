@@ -17,7 +17,7 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtService {
 
-    @Value("${SECRET_KEY}")
+    @Value("${jwt.secret-key}")
     private String secret;
 
     public String generareJWT(Utilizatori utilizatori){
