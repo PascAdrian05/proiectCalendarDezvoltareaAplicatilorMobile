@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.google.android.libraries.mapsplatform.secrets.gradle.plugin)
 }
 
+val backendBaseUrl = (findProperty("BACKEND_BASE_URL") as String?) ?: "http://10.0.2.2:8080/"
+
 secrets {
     propertiesFileName = "app/secrets.properties"
     defaultPropertiesFileName = "app/local.defaults.properties"
@@ -24,6 +26,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "BACKEND_BASE_URL", "\"$backendBaseUrl\"")
     }
 
     buildTypes {
@@ -41,6 +44,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 
