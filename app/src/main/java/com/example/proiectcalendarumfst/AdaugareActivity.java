@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -48,6 +49,7 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
     LocalDate date;
     String selectedItem = "";
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private ProgressBar progressBar;
 
     private final ActivityResultLauncher<Intent> mapLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -86,6 +88,16 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
         notite = findViewById(R.id.notite);
         buttonLocatie = findViewById(R.id.buttonLocatie);
 
+        // Inițializează progress bar dacă există în layout
+        try {
+            progressBar = findViewById(R.id.progressBar);
+            if (progressBar != null) {
+                progressBar.setVisibility(View.GONE);
+            }
+        } catch (Exception e) {
+            // Progress bar nu este în layout, normal
+        }
+
         DtoEveniment ev = (DtoEveniment) getIntent().getSerializableExtra("evenimentUpdate");
         int index = getIntent().getIntExtra("index", -1);
 
@@ -119,6 +131,12 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                     String token = sharedPreferences.getString("token", null);
 
                     if (token != null) {
+                        // Arată progress bar
+                        if (progressBar != null) {
+                            progressBar.setVisibility(View.VISIBLE);
+                        }
+                        button2.setEnabled(false);
+
                         String tokenptrServer = "Bearer " + token;
 
                         // Actualizăm obiectul local
@@ -129,23 +147,39 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                         ev.setNote(notite.getText().toString());
 
                         ApiService apiService = RetrofitClient.getClient().create(ApiService.class);
-                        // Apelăm serverul pentru UPDATE
+                        // Apelăm serverul pentru UPDATE pe background thread
                         apiService.updateEveniment(tokenptrServer, ev.getId(), ev).enqueue(new Callback<DtoEveniment>() {
                             @Override
                             public void onResponse(Call<DtoEveniment> call, Response<DtoEveniment> response) {
+                                // Ascunde progress bar și re-enable button
+                                if (progressBar != null) {
+                                    progressBar.setVisibility(View.GONE);
+                                }
+                                button2.setEnabled(true);
+
                                 if (response.isSuccessful()) {
-                                    Toast.makeText(AdaugareActivity.this, "Eveniment modificat!", Toast.LENGTH_SHORT).show();
-                                    finish();
+                                    Toast.makeText(AdaugareActivity.this, "Eveniment modificat cu succes!", Toast.LENGTH_SHORT).show();
+                                    // Folosește post() pentru a te asigura că finish() se execută pe Main Thread
+                                    button2.post(() -> finish());
                                 } else {
-                                    Toast.makeText(AdaugareActivity.this, "Eroare la modificare: " + response.code(), Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(AdaugareActivity.this, "Eroare la modificare: " + response.code() + " - " + response.message(), Toast.LENGTH_LONG).show();
                                 }
                             }
 
                             @Override
                             public void onFailure(Call<DtoEveniment> call, Throwable t) {
-                                Toast.makeText(AdaugareActivity.this, "Eroare rețea", Toast.LENGTH_SHORT).show();
+                                // Ascunde progress bar și re-enable button
+                                if (progressBar != null) {
+                                    progressBar.setVisibility(View.GONE);
+                                }
+                                button2.setEnabled(true);
+
+                                Toast.makeText(AdaugareActivity.this, "Eroare rețea: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                                t.printStackTrace();
                             }
                         });
+                    } else {
+                        Toast.makeText(AdaugareActivity.this, "Token nu a fost găsit. Conectează-te din nou!", Toast.LENGTH_SHORT).show();
                     }
                 }
             });
@@ -157,6 +191,12 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                     SharedPreferences sharedPreferences=getSharedPreferences("preferences",MODE_PRIVATE);
                     String token=sharedPreferences.getString("token",null);
                     if(token!=null){
+                        // Arată progress bar
+                        if (progressBar != null) {
+                            progressBar.setVisibility(View.VISIBLE);
+                        }
+                        button2.setEnabled(false);
+
                         String tokenptrServer="Bearer "+token;
                         String dataFormatataPentruServer = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
                         DtoEveniment evenimentReq = new DtoEveniment(titlu.getText().toString(), dataFormatataPentruServer, buttonOra.getText().toString(), buttonLocatie.getText().toString(), selectedItem, notite.getText().toString());
@@ -165,13 +205,32 @@ public class AdaugareActivity extends AppCompatActivity implements TimePickerDia
                         apiService.adaugareEveniment(evenimentReq, tokenptrServer).enqueue(new Callback<DtoEveniment>() {
                             @Override
                             public void onResponse(Call<DtoEveniment> call, Response<DtoEveniment> response) {
+                                // Ascunde progress bar și re-enable button
+                                if (progressBar != null) {
+                                    progressBar.setVisibility(View.GONE);
+                                }
+                                button2.setEnabled(true);
+
                                 if(response.isSuccessful()){
-                                    finish();
+                                    Toast.makeText(AdaugareActivity.this, "Eveniment adăugat cu succes!", Toast.LENGTH_SHORT).show();
+                                    button2.post(() -> finish());
+                                } else {
+                                    Toast.makeText(AdaugareActivity.this, "Eroare la adăugare: " + response.code(), Toast.LENGTH_LONG).show();
                                 }
                             }
                             @Override
-                            public void onFailure(Call<DtoEveniment> call, Throwable t) {}
+                            public void onFailure(Call<DtoEveniment> call, Throwable t) {
+                                // Ascunde progress bar și re-enable button
+                                if (progressBar != null) {
+                                    progressBar.setVisibility(View.GONE);
+                                }
+                                button2.setEnabled(true);
+
+                                Toast.makeText(AdaugareActivity.this, "Eroare rețea: " + t.getMessage(), Toast.LENGTH_LONG).show();
+                            }
                         });
+                    } else {
+                        Toast.makeText(AdaugareActivity.this, "Token nu a fost găsit. Conectează-te din nou!", Toast.LENGTH_SHORT).show();
                     }
                 }
             });

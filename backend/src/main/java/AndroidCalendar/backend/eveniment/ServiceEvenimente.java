@@ -61,6 +61,7 @@ public class ServiceEvenimente {
         eveniment.setCategore(dto.categorie());
         eveniment.setData(LocalDate.parse(dto.data()));
         eveniment.setOra(dto.ora());
+        eveniment.setLocatie(dto.locatie());
 
         repositoryEvenimente.save(eveniment);
 
